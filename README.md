@@ -1,2 +1,2 @@
 # Gnotifs
-For Sending notification to vaious platforms
+For Sending notification to various platforms
