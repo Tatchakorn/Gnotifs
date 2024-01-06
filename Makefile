@@ -4,7 +4,7 @@ test:
 	go test ./TronNotif/TSP/... -coverprofile=c.out
 	go tool cover -html=c.out
 fmt:
-	go fmt ./TronNotif/TSP
+	go fmt ./TronNotif/TSP/...
 runpy:
 	python main.py
 testpy:
