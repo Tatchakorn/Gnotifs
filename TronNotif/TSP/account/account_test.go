@@ -33,9 +33,16 @@ func setupAccountsSuite(tb testing.TB) (func(tb testing.TB), AccountDispatch) {
 					Token:  tokenTable["USDT"],
 					Amount: "130200000000000"},
 				"DOGE": Balance{
-						Token:  tokenTable["DOGE"],
-						Amount: "12311001"},
+					Token:  tokenTable["DOGE"],
+					Amount: "12311001"},
 			},
+			"testNormal": Balances{},
+		},
+		Seldom: Accounts{
+			"testSeldom": Balances{},
+		},
+		Frozen: Accounts{
+			"testFrozen": Balances{},
 		},
 	}
 
@@ -107,4 +114,55 @@ func TestAccount_GetReadbleAmount(t *testing.T) {
 		})
 	}
 
+}
+
+func TestAccountDispatch_Add(t *testing.T) {
+	teardownSuite, ad := setupAccountsSuite(t)
+	defer teardownSuite(t)
+	normalAddr := "testAddNormal"
+	seldomAddr := "testAddSeldom"
+	frozenAddr := "testAddFrozen"
+	ad.add(Normal, normalAddr, Balances{})
+	ad.add(Seldom, seldomAddr, Balances{})
+	ad.add(Frozen, frozenAddr, Balances{})
+
+	
+	if _, ok := ad.Normal[normalAddr]; !ok {
+		t.Error("failed to add: Normal")
+	}
+	
+	if _, ok := ad.Seldom[seldomAddr]; !ok {
+		t.Error("failed to add: Seldom")
+	}
+
+	if _, ok := ad.Frozen[frozenAddr]; !ok {
+		t.Error("failed to add: Frozen")
+	}
+}
+
+func TestAccountDispatch_Remove(t *testing.T) {
+	teardownSuite, ad := setupAccountsSuite(t)
+	defer teardownSuite(t)
+
+	normalAddr := "testNormal"
+	seldomAddr := "testSeldom"
+	frozenAddr := "testFrozen"
+		
+	ad.remove(Normal, normalAddr)
+	ad.remove(Seldom, seldomAddr)
+	ad.remove(Frozen, frozenAddr)
+
+	
+	if _, ok := ad.Normal[normalAddr]; ok {
+		t.Error("failed to remove: Normal")
+	}
+
+	
+	if _, ok := ad.Seldom[seldomAddr]; ok {
+		t.Error("failed to remove: Seldom")
+	}
+
+	if _, ok := ad.Frozen[frozenAddr]; ok{
+		t.Error("failed to remove: Frozen")
+	}
 }

@@ -3,6 +3,7 @@ package account
 import (
 	"strconv"
 	"time"
+
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
@@ -31,9 +32,6 @@ type Balance struct {
 // tokenName -> Balance
 type Balances map[string]Balance
 
-// address -> Balances
-type Accounts map[string]Balances
-
 // Returns balance in the human-readable format
 // by adding decimal & thousands separator and
 func (bal Balance) GetReadbleAmount() (string, error) {
@@ -48,23 +46,24 @@ func (bal Balance) GetReadbleAmount() (string, error) {
 		beforeDecimal := amount[:decIndex]
 		n, err := strconv.Atoi(beforeDecimal)
 
-		if err != nil { return "", err }
+		if err != nil {
+			return "", err
+		}
 		// add thousands separator
-		formattedBeforeDecimal := p.Sprintf("%d",  n)
+		formattedBeforeDecimal := p.Sprintf("%d", n)
 		afterDecimal := amount[decIndex:]
 		return formattedBeforeDecimal + "." + afterDecimal, nil
-	}  
+	}
 
 	// amount < 1
 
 	beforeDecimal := "0"
-	// left pad with 0 
+	// left pad with 0
 	afterDecimal := p.Sprintf("%0*s", decimalPlace, amount)
 
-	return  beforeDecimal + "." + afterDecimal, nil
+	return beforeDecimal + "." + afterDecimal, nil
 
 }
-
 
 // API Call frequecies:
 // API Call frequecies:
@@ -79,13 +78,13 @@ const (
 	NUMBER_OF_QUEUES = 3
 )
 
-// Store each category in its own slice
-type AccountDispatch struct {
-	TokenTable Tokens
-	Normal     Accounts
-	Seldom     Accounts
-	Frozen     Accounts
-}
+type FreqStat int8
+
+const (
+	Normal FreqStat = iota
+	Seldom
+	Frozen
+)
 
 func (f FreqStat) String() string {
 	switch f {
@@ -99,10 +98,37 @@ func (f FreqStat) String() string {
 	return "<unknown>"
 }
 
-type FreqStat int8
+// address -> Balances
+type Accounts map[string]Balances
 
-const (
-	Normal FreqStat = iota
-	Seldom
-	Frozen
-)
+// Store each category in its own slice
+type AccountDispatch struct {
+	TokenTable Tokens
+	Normal     Accounts
+	Seldom     Accounts
+	Frozen     Accounts
+}
+
+// add (address, balances) to Accounts
+func (ad *AccountDispatch) add(freq FreqStat, addr string, bal Balances) {
+	switch freq {
+	case Normal:
+		ad.Normal[addr] = bal
+	case Seldom:
+		ad.Seldom[addr] = bal
+	case Frozen:
+		ad.Frozen[addr] = bal
+	}
+}
+
+// remove(address) from Accounts
+func (ad *AccountDispatch) remove(freq FreqStat, addr string) {
+	switch freq {
+	case Normal:
+		delete(ad.Normal, addr)
+	case Seldom:
+		delete(ad.Seldom, addr)
+	case Frozen:
+		delete(ad.Frozen, addr)
+	}
+}
