@@ -6,28 +6,42 @@ import (
 )
 
 // for single test
-func setupAccountsSuite(tb testing.TB) (func(tb testing.TB), Accounts) {
+func setupAccountsSuite(tb testing.TB) (func(tb testing.TB), AccountDispatch) {
 	log.Println("setup suite")
 
-	usdtToken := Token{TokenName: "USDT", TokenDecimal: 6}
-	acc := Accounts{
-		Account{
-			Address: "addr1",
-			Balance: Balance{
-				Token: usdtToken, Amount: 29206347833}},
-		Account{
-			Address: "addr2",
-			Balance: Balance{
-				Token: usdtToken, Amount: 29206347833}},
-		Account{
-			Address: "addr3",
-			Balance: Balance{
-				Token: usdtToken, Amount: 29206347833}},
+	tokenTable := map[string]Token{
+		"USDT": {TokenName: "USDT", TokenDecimal: 10},
+		"ETH":  {TokenName: "ETH", TokenDecimal: 18},
+		"DOGE": {TokenName: "DOGE", TokenDecimal: 8},
+	}
+
+	ad := AccountDispatch{
+		Normal: Accounts{
+			"TUAAqYySyBJDLJDxnQKqtcPBW1JXJuqrSS": Balances{
+				"USDT": Balance{
+					Token:  tokenTable["USDT"],
+					Amount: "130205193380000"},
+				"ETH": Balance{
+					Token:  tokenTable["ETH"],
+					Amount: "1162312289316921"},
+				"DOGE": Balance{
+					Token:  tokenTable["DOGE"],
+					Amount: "293532778"},
+			},
+			"TT2T17KZhoDu47i2E4FWxfG79zdkEWkU9N": Balances{
+				"USDT": Balance{
+					Token:  tokenTable["USDT"],
+					Amount: "130200000000000"},
+				"DOGE": Balance{
+						Token:  tokenTable["DOGE"],
+						Amount: "12311001"},
+			},
+		},
 	}
 
 	return func(tb testing.TB) {
 		log.Println("teardown suite")
-	}, acc
+	}, ad
 }
 
 // for collection of tests
@@ -39,37 +53,10 @@ func setupAccountsTest(tb testing.TB) func(tb testing.TB) {
 	}
 }
 
-func TestAccounts_GetIndexFromAddr(t *testing.T) {
-	teardownSuite, accounts := setupAccountsSuite(t)
+func TestAccount_GetReadbleAmount(t *testing.T) {
+
+	teardownSuite, ad := setupAccountsSuite(t)
 	defer teardownSuite(t)
-
-	table := []struct {
-		name     string
-		addr     string
-		expected int
-	}{
-		{"address one", "addr1", 0},
-		{"address rwo", "addr2", 1},
-		{"not exist", "Noaddr", -1},
-	}
-
-	for _, tc := range table {
-		t.Run(tc.name, func(t *testing.T) {
-			teardownTest := setupAccountsTest(t)
-			defer teardownTest(t)
-
-			actual := accounts.GetIndexFromAddr(tc.addr)
-
-			if actual != tc.expected {
-				t.Errorf("expected: %v, got %v", tc.expected, actual)
-			}
-		})
-	}
-}
-
-func TestAccount_GetAmountStr(t *testing.T) {
-
-	usdtToken := Token{TokenName: "USDT", TokenDecimal: 6}
 
 	table := []struct {
 		name     string
@@ -77,36 +64,29 @@ func TestAccount_GetAmountStr(t *testing.T) {
 		expected string
 	}{
 		{
-			"With decimal and digit separator",
-			Balance{
-				Token:  usdtToken,
-				Amount: 29206347833,
-			},
-			"29,206.347833",
+			"(USDT) decimal and digit separator",
+			ad.Normal["TUAAqYySyBJDLJDxnQKqtcPBW1JXJuqrSS"]["USDT"],
+			"13,020.5193380000",
 		},
 		{
-			"With decimal",
-			Balance{
-				Token:  usdtToken,
-				Amount: 6347833,
-			},
-			"6.347833",
+			"(ETH) decimal only",
+			ad.Normal["TUAAqYySyBJDLJDxnQKqtcPBW1JXJuqrSS"]["ETH"],
+			"0.001162312289316921",
 		},
 		{
-			"With digit separator",
-			Balance{
-				Token:  usdtToken,
-				Amount: 29206000000,
-			},
-			"29,206.000000",
+			"(DOGE) decimal only",
+			ad.Normal["TUAAqYySyBJDLJDxnQKqtcPBW1JXJuqrSS"]["DOGE"],
+			"2.93532778",
 		},
 		{
-			"With nothing",
-			Balance{
-				Token:  usdtToken,
-				Amount: 6000000,
-			},
-			"6.000000",
+			"(USDT) No decimal",
+			ad.Normal["TT2T17KZhoDu47i2E4FWxfG79zdkEWkU9N"]["USDT"],
+			"13,020.0000000000",
+		},
+		{
+			"(DOGE) No decimal",
+			ad.Normal["TT2T17KZhoDu47i2E4FWxfG79zdkEWkU9N"]["DOGE"],
+			"0.12311001",
 		},
 	}
 
@@ -115,7 +95,11 @@ func TestAccount_GetAmountStr(t *testing.T) {
 			teardownTest := setupAccountsTest(t)
 			defer teardownTest(t)
 
-			actual := tc.bal.GetAmountStr()
+			actual, err := tc.bal.GetReadbleAmount()
+
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if actual != tc.expected {
 				t.Errorf("expected: \"%s\", got \"%s\"", tc.expected, actual)

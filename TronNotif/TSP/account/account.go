@@ -1,47 +1,108 @@
 package account
 
 import (
-	"math"
-	"slices"
 	"strconv"
+	"time"
+	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
 
 // token Info
 type Token struct {
 	TokenName    string
-	TokenDecimal uint16
+	TokenDecimal int
 }
 
-// Fields NoUpdateCount: If the fetched balance is the same as
-// from the previous balane then increment by 1
+// tokenName -> Token
+type Tokens map[string]Token
+
+// NoUpdateCount: used to determine which category
+// the address should be in. (increment by 1 when balance not updated)
+//
+//	      NoUpdateCount <= 360 (6 hrs)  -> Normal
+//	360 < NoUpdateCount <= 720 (10 hrs) -> Seldom
+//	720 < NoUpdateCount                 -> Frozen
 type Balance struct {
-	Token  Token
-	Amount int64
+	Token         Token
+	Amount        string
+	NoUpdateCount int
 }
 
-type Account struct {
-	Address string
-	Balance Balance
-}
+// tokenName -> Balance
+type Balances map[string]Balance
 
-type Accounts []Account
-
-// Returns ac index of account from address
-func (acc Accounts) GetIndexFromAddr(addr string) int {
-	index := slices.IndexFunc[Accounts](acc, func(a Account) bool { return a.Address == addr })
-	return index
-}
+// address -> Balances
+type Accounts map[string]Balances
 
 // Returns balance in the human-readable format
-// add decimal separator separator and
-// and digit separator
-func (bal Balance) GetAmountStr() string {
-	p := message.NewPrinter(message.MatchLanguage("en"))
+// by adding decimal & thousands separator and
+func (bal Balance) GetReadbleAmount() (string, error) {
+
 	decimalPlace := bal.Token.TokenDecimal
-	beforeDecimalAmt := bal.Amount / int64(math.Pow(10, float64(decimalPlace)))
-	beforeDecimal := p.Sprint(beforeDecimalAmt)
-	Amount := strconv.Itoa(int(bal.Amount))
-	afterDecimalAmt := Amount[len(Amount) - int(decimalPlace):]
-	return  beforeDecimal + "." + afterDecimalAmt
+	amount := bal.Amount
+	p := message.NewPrinter(language.English)
+
+	// amount >= 1
+	if len(amount) > decimalPlace {
+		decIndex := len(amount) - decimalPlace
+		beforeDecimal := amount[:decIndex]
+		n, err := strconv.Atoi(beforeDecimal)
+
+		if err != nil { return "", err }
+		// add thousands separator
+		formattedBeforeDecimal := p.Sprintf("%d",  n)
+		afterDecimal := amount[decIndex:]
+		return formattedBeforeDecimal + "." + afterDecimal, nil
+	}  
+
+	// amount < 1
+
+	beforeDecimal := "0"
+	// left pad with 0 
+	afterDecimal := p.Sprintf("%0*s", decimalPlace, amount)
+
+	return  beforeDecimal + "." + afterDecimal, nil
+
 }
+
+
+// API Call frequecies:
+// API Call frequecies:
+// FREQ_1: (Normal) every 1 min
+// FREQ_2: (Seldom)       2 min
+// FREQ_3: (Frozen)       3 min
+
+const (
+	FREQ_1           = 1 * time.Second
+	FREQ_2           = 2 * time.Second
+	FREQ_3           = 3 * time.Second
+	NUMBER_OF_QUEUES = 3
+)
+
+// Store each category in its own slice
+type AccountDispatch struct {
+	TokenTable Tokens
+	Normal     Accounts
+	Seldom     Accounts
+	Frozen     Accounts
+}
+
+func (f FreqStat) String() string {
+	switch f {
+	case Normal:
+		return "Normal"
+	case Seldom:
+		return "Seldom"
+	case Frozen:
+		return "Frozen"
+	}
+	return "<unknown>"
+}
+
+type FreqStat int8
+
+const (
+	Normal FreqStat = iota
+	Seldom
+	Frozen
+)
